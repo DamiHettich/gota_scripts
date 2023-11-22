@@ -46,7 +46,7 @@ def fields_table(gsid, dbid):
     f.columns = f.iloc[0].replace(field_columns)
     f = f[1:].reset_index(drop=True)
     f = f[['weather_factor','rain_factor','dropcontrol_id','day_starttime','delay','weekday']]
-    f['weatherstation'] = 1
+    f['weather_station'] = 1
     f['season']=1
     f['basic_field']=dbid
     return f
@@ -55,7 +55,7 @@ def fields_table(gsid, dbid):
 def zone_and_pump_tables(gsid, dbid):
     zone_columns = {
             'equipo': 'pump',
-            'sector': 'zone_number',
+            'sector': 'zone',
             'tipo_riego': 'irrigation_type',
             'id_wiseconn': 'dropcontrol_id',
             'coef_riego': 'irrigation_coef',
@@ -76,21 +76,27 @@ def zone_and_pump_tables(gsid, dbid):
             'especie':'species', 
             'cuartel':'area_name',
             'rend/hect':'yield_kg',
+            'rend_hect':'yield_kg',
+            'Rend/hect':'yield_kg',
+            'Rend/ha':'yield_kg',
 
         }
     
     f = spreadsheet_to_pandas('info_sectores',gsid)
     pump_table = f[['equipo','tranque_orig']].groupby(['equipo','tranque_orig']).count().reset_index()
-    pump_table.rename(columns={'equipo':'name','tranque_orig':'reservoir'})
+    pump_table = pump_table.rename(columns={'equipo':'pump','tranque_orig':'reservoir'})
     pump_table['field'] = dbid
     
     f = f.rename(columns=zone_columns)
-    f.drop(columns=['rendimiento', 'pondera_kc'])
+    for column in ['rendimiento', 'pondera_kc', 'tranque_orig', 'species']:
+        if column in f.columns:
+            f = f.drop(columns=[column])
+    
     f['field'] = dbid
-    f['species'] = 1
+    f['species_obj'] = 1
     return f, pump_table
 
-def horizon_table(gsid):
+def horizon_table(gsid, dbid):
     horizon_columns = {
         'equipo': 'pump', 
         'sector': 'zone', 
@@ -101,8 +107,13 @@ def horizon_table(gsid):
        'pedregosidad':'pedregosity', 
         }  
     f = spreadsheet_to_pandas('info_horizontes',gsid)
+    f['field'] = dbid
     f = f.rename(columns=horizon_columns)
     return f
 
-
-
+def full_sheet(pumps, zones, horizons):
+    pumps['pump_id'] = pumps.index()
+    horizons['horizon_id'] = horizons.index()
+    zones['zone_id'] = zones.index()
+    sheet = pumps.merge(zones, on=['pump','zone']).merge(horizons, on=['pump','zone'])
+    return sheet[['pump_id','pump','zone_id','zone','horizon','horizon_id']]
